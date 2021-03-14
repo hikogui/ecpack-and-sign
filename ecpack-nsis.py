@@ -28,8 +28,8 @@ def main():
     prefix = options.build_dir
 
     with zipfile.ZipFile(input_zip, "r") as zip_file:
-        installer = ecpack.NSISInstaller.NSISInstaller(zip_file)
-        file_name = installer.create_nsis_installer(prefix)
+        installer = ecpack.NSISInstaller.NSISInstaller(zip_file, prefix)
+        file_name = installer.create_installer()
         print("Installer '{}' created successfully.".format(file_name))
 
 if __name__ == "__main__":

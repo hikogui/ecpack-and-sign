@@ -47,17 +47,23 @@ class Component (object):
 
 
 class Installer (object):
-    def __init__(self, zip_file):
+    def __init__(self, zip_file, prefix):
         self.zip_file = zip_file
+        self.prefix = prefix
+
+        with zip_file.open("_cpack/package.json") as package_json:
+            package_data = json.load(package_json)
+            self.name = package_data["name"]
+            self.display_name = package_data["display-name"]
+            self.version = package_data["version-string"]
+            self.license = package_data["license"]
+            self.homepage = package_data["homepage"]
+            self.description = package_data["description"]
+            self.vendor = package_data["vendor"]
 
         with zip_file.open("ecpack.json") as ecpack_json:
             ecpack_data = json.load(ecpack_json)
-
-            self.package_name = ecpack_data["packageName"]
-            self.package_version = ecpack_data["packageVersion"]
-
             self.components = Installer.parse_components(ecpack_data, zip_file)
-
 
     @classmethod
     def parse_components(cls, ecpack_data, zip_file):
@@ -88,36 +94,31 @@ class Installer (object):
 
         return components
 
-    def extract_components(self, prefix):
+    def extract_components(self):
         """Extract files from each component and merge them in the same directory
-        @param prefix Location where the temporary files are stored.
-
         """
         for component in self.components.values():
-            component.extract_files(self.zip_file, prefix)
+            component.extract_files(self.zip_file, self.prefix)
 
-    def make_nsis_uninstaller(self):
-        pass
+    def extract_directory(self, directory):
+        for zip_info in self.zip_file.infolist():
+            if zip_info.is_dir():
+                continue
+            if not zip_info.filename.startswith(directory + "/"):
+                continue
 
-    def make_nsis_installer(self, uninstaller_filename):
-        pass
+            out_file_name = self.prefix + "/" + zip_info.filename
+            out_dir_name = os.path.dirname(out_file_name)
+            os.makedirs(out_dir_name, exist_ok=True)
+            with open(out_file_name, "wb") as out_fd:
+                out_fd.write(self.zip_file.read(zip_info))
+                out_fd.close()
 
-    def create_nsis_installer(self, prefix):
-        """Create a nsis installer
-
-        @param prefix Location where the temporary files are stored.
-        @return file name of the installer.
+    def file_exists(self, file_name):
+        """Check if a file exists in the zip file
         """
-        self.extract_components(prefix)
+        for zip_info in self.zip_file.infolist():
+            if zip_info.filename == file_name:
+                return True
+        return False
 
-        for component in self.components.values():
-            for executable_file_name in component.executable_file_names():
-                ecpack.sign_executable.sign_executable(executable_file_name)
-
-        uninstaller_filename = self.make_nsis_uninstaller()
-        ecpack.sign_executable.sign_executable(uninstaller_filename)
-
-        installer_filename = self.make_nsis_installer(uninstaller_filename)
-        ecpack.sign_executable.sign_executable(installer_filename)
-
-        return installer_filename
