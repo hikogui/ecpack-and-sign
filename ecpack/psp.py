@@ -1,62 +1,49 @@
 
 
-def find_end_of_expression(text, i, separator):
+def get_expression(text, begin, separator):
     """Find the end of a expression or statement
 
-    @return index at end of expression, the matching separator, end-of-line or end-of-text
+    @return (index beyond the terminator, the expression, The terminator or empty on end-of-text)
     """
     end_chars = separator + "\n\r\f"
-    stack = []
+    bracket_stack = 0
     in_string = None
 
     end = len(text)
+    i = begin
     while i < end:
         c = text[i]
-        if c == "[":
-            stack.append("]")
-        elif c == "(":
-            stack.append("(")
-        elif c == "{":
-            stack.append("{")
-        elif c in "])}":
-            if stack[-1] != stack.pop():
-                raise RuntimeError("Found non-matching '{}'".format(c))
-        elif in_string:
+        if in_string:
             if c == in_string:
                 in_string = None
             elif c == "\\":
                 i += 1
         elif c in "'\"":
             in_string = c
-
-        elif c in end_chars and len(stack) == 0:
-            return i
+        elif c in "[({":
+            bracket_stack += 1
+        elif c in "])}":
+            bracket_stack -= 1
+        elif c in end_chars and not bracket_stack:
+            break
 
         i += 1
-    else:
-        return i
 
-def escape_dqstring(text):
-    """Escape all dquote and all backslashes
-    """
-    r = []
-
-    for c in text:
-        if c == '\\':
-            r.append('\\\\')
-        elif c == '"':
-            r.append('\\"')
-        elif c == '\n':
-            r.append('\\n')
-        elif c == '\r':
-            r.append('\\r')
-        else:
-            r.append(c)
-
-    return "".join(r)
+    expression = text[begin:i].strip()
+    terminator = text[i:i + 1]
+    return i + 1, expression, terminator
 
 def I(indent):
     return "    " * indent
+
+def append_text(program, indent, text, i, j):
+    for line in text[i:j].splitlines(True):
+        program.append(I(indent) + '__r.append({})'.format(repr(line)))
+    return j
+
+def find(text, separator, i):
+    j = text.find(separator, i)
+    return j if j != -1 else len(text)
 
 def parse_psp(text, separator):
     """Parse PSP text and return a python script
@@ -66,77 +53,47 @@ def parse_psp(text, separator):
     @param tab_size The size of tabs
     @param strip_count The size of initial whitespace to remove from each line.
     """
-
-    lines = ['__r = []']
+    program = ['__r = []']
     indent = 0
-    str_begin = 0
     i = 0
-    while i < len(text):
-        c = text[i]
-        if c == "\n":
-            # End of line, print the whole string, including line-feed.
-            lines.append(I(indent) + '__r.append("{}\\n")'.format(escape_dqstring(text[str_begin:i])))
 
-            # Continue past the line-feed.
-            i += 1
-            str_begin = i
+    while True:
+        j = find(text, separator, i)
+        i = append_text(program, indent, text, i, j)
+        if i == len(text):
+            break
 
-        elif c == separator:
-            lines.append(I(indent) + '__r.append("{}")'.format(escape_dqstring(text[str_begin:i])))
+        i, expression, terminator = get_expression(text, i + 1, separator)
 
-            j = find_end_of_expression(text, i + 1, separator)
-            expression = text[i + 1:j].strip()
-            terminator = text[j:j + 1]
+        if terminator == separator and expression == "":
+            # Separator escape, print the whole string.
+            program.append(I(indent) + '__r.append({})'.format(repr(separator)))
 
-            if terminator == separator and expression == "":
-                # Separator escape, print the whole string.
-                lines.append(I(indent) + '__r.append("{}")'.format(escape_dqstring(separator)))
+        elif terminator == separator:
+            # Print the result of the expression.
+            program.append(I(indent) + "__r.append(str({}))".format(expression))
 
-            elif terminator == separator:
-                # Print the result of the expression.
-                lines.append(I(indent) + "__r.append(str({}))".format(expression))
+        elif expression.startswith("end"):
+            # End a block.
+            indent -= 1
 
-            elif expression.startswith("end"):
-                # End a block.
-                indent -= 1
+        elif expression.startswith("elif ") or expression.startswith("else:"):
+            # elif and else statements both end and start a block.
+            program.append(I(indent - 1) + expression)
 
-            elif expression.startswith("elif ") or expression.startswith("else:"):
-                # elif and else statements both end the block.
-                lines.append(I(indent - 1) + expression)
-
-            elif expression.endswith(":"):
-                # statements ending with : start a new block.
-                lines.append(I(indent) + expression)
-                indent += 1
-
-            else:
-                # Other statement are in the current block.
-                lines.append(I(indent) + expression)
-            
-            # Jump over the expression and the terminator. 
-            i = j + 1
-            str_begin = i
+        elif expression.endswith(":"):
+            # statements ending with : start a new block.
+            program.append(I(indent) + expression)
+            indent += 1
 
         else:
-            # Other characters are skipped.
-            next_lf = text.find("\n", i)
-            if next_lf == -1:
-                next_lf = len(text)
-
-            next_sep = text.find(separator, i)
-            if next_sep == -1:
-                next_sep = len(text)
-
-            i = min(next_lf, next_sep)
-
-    # print the rest
-    if str_begin < len(text):
-        lines.append(I(indent) + '__r.append("{}")'.format(escape_dqstring(text[str_begin:])))
-
+            # Other statement are in the current block.
+            program.append(I(indent) + expression)
+    
     if indent != 0:
         raise RuntimeError("Python blocks incorrectly terminated")
 
-    return "\n".join(lines)
+    return "\n".join(program)
 
 def psp(text, namespace, separator="%"):
     """A very simple template language parser and evaluate.
