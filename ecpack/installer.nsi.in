@@ -72,11 +72,11 @@ Section "-Core"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "DisplayName" "%self.display_name%"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "DisplayVersion" "%self.version%"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "Publisher" "%self.vendor%"
-    WriteRegDword HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "VersionMinor" 0x%hex(self.minor_version())%
-    WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "VersionMajor" 0x%hex(self.major_version())%
+    WriteRegDword HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "VersionMinor" %hex(self.minor_version())%
+    WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "VersionMajor" %hex(self.major_version())%
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "InstallLocation" "$INSTDIR"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "UninstallString" "$INSTDIR\uninstall.exe"
-    WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "EstimatedSize" 0x%hex(self.file_size() // 1024)%
+    WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "EstimatedSize" %hex(self.file_size() // 1024)%
     WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "NoModify" 0x1
     WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "NoRepair" 0x1
 SectionEnd
