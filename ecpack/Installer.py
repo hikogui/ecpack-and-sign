@@ -68,7 +68,7 @@ class Installer (object):
             self.homepage = package_data["homepage"]
             self.description = package_data["description"]
             self.vendor = package_data["vendor"]
-            self.signtool_fmt = "\"{signtool}\" sign /debug /f \"c:\\users\\tjienta\\ttauri-project.pfx\" /p {password} /fd SHA256 \"{executable}\""
+            self.signtool_fmt = package_data["signtool"]
             self.signtool_password = None
 
         with zip_file.open("ecpack.json") as ecpack_json:
