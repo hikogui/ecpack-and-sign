@@ -44,9 +44,13 @@ class NSISInstaller (ecpack.Installer.Installer):
 
     def create_uninstaller(self):
         # We must use os.system to cause UAC to elevate the privilages of the create_uninstaller.exe
-        os.system('""{}" /DCREATE_UNINSTALLER "{}""'.format(self.makensis_exe_filename(), self.installer_nsi_filename()))
+        r = os.system('""{}" /DCREATE_UNINSTALLER "{}""'.format(self.makensis_exe_filename(), self.installer_nsi_filename()))
+        if r != 0:
+            raise RuntimeError("Failed to compile create_uinstaller executable")
 
-        os.system('""{}" /S"'.format(self.create_uninstaller_exe_filename()))
+        r = os.system('""{}" /S"'.format(self.create_uninstaller_exe_filename()))
+        if r != 2:
+            raise RuntimeError("Failed to create the uninstaller")
 
 
     def create_installer(self):
@@ -60,13 +64,16 @@ class NSISInstaller (ecpack.Installer.Installer):
 
         for component in self.components:
             for executable_file_name in component.executable_file_names():
-                ecpack.sign_executable.sign_executable(executable_file_name)
+                self.signtool(os.path.abspath(os.path.join(self.prefix, component.name, executable_file_name)))
 
         self.create_installer_nsi()
         self.create_uninstaller()
-        ecpack.sign_executable.sign_executable(self.uninstall_exe_filename())
+        self.signtool(os.path.abspath(os.path.join(self.prefix, self.uninstall_exe_filename())))
 
-        os.system('""{}" "{}""'.format(self.makensis_exe_filename(), self.installer_nsi_filename()))
-        ecpack.sign_executable.sign_executable(self.install_exe_filename())
+        r = os.system('""{}" "{}""'.format(self.makensis_exe_filename(), self.installer_nsi_filename()))
+        if r != 0:
+            raise RuntimeError("Failed to create the installer")
+
+        self.signtool(os.path.abspath(os.path.join(self.prefix, self.install_exe_filename())))
 
         return self.install_exe_filename()

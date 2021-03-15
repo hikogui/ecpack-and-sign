@@ -68,7 +68,9 @@ SectionEnd
 
 Section "-Core"
     SetOutPath "$INSTDIR"
+!ifndef CREATE_UNINSTALLER
     File "uninstall.exe"
+!endif
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "DisplayName" "%self.display_name%"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "DisplayVersion" "%self.version%"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "Publisher" "%self.vendor%"

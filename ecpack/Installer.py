@@ -3,6 +3,7 @@ import os
 import os.path
 import json
 import ecpack.sign_executable
+import getpass
 
 class Component (object):
     def __init__(self, name, display_name, description, enabled, hidden, required, dependencies):
@@ -67,6 +68,8 @@ class Installer (object):
             self.homepage = package_data["homepage"]
             self.description = package_data["description"]
             self.vendor = package_data["vendor"]
+            self.signtool_fmt = "\"{signtool}\" sign /debug /f \"c:\\users\\tjienta\\ttauri-project.pfx\" /p {password} /fd SHA256 \"{executable}\""
+            self.signtool_password = None
 
         with zip_file.open("ecpack.json") as ecpack_json:
             ecpack_data = json.load(ecpack_json)
@@ -100,6 +103,19 @@ class Installer (object):
                 components.append(component)
 
         return components
+
+    def signtool(self, executable_file_name):
+        if "{password}" in self.signtool_fmt and self.signtool_password is None:
+            self.signtool_password = getpass.getpass("signtool password: ")
+
+        signtool_executable = "c:\\Program Files (x86)\\Windows Kits\\10\\App Certification Kit\\signtool.exe"
+        signtool_command = self.signtool_fmt.format(signtool=signtool_executable, executable=executable_file_name, password=self.signtool_password)
+        command = '"{}"'.format(signtool_command)
+
+        r = os.system(command)
+        print(command)
+        if r != 0:
+            raise RuntimeError("Failed running signtool: {}".format(command))
 
     def extract_components(self):
         """Extract files from each component and merge them in the same directory
