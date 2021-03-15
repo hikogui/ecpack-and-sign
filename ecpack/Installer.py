@@ -113,7 +113,6 @@ class Installer (object):
         command = '"{}"'.format(signtool_command)
 
         r = os.system(command)
-        print(command)
         if r != 0:
             raise RuntimeError("Failed running signtool: {}".format(command))
 
