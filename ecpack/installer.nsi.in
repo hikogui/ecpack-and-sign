@@ -24,8 +24,7 @@ Unicode True
 Name "%self.display_name%"
 !ifdef CREATE_UNINSTALLER
     OutFile "%self.create_uninstaller_exe_filename()%"
-!endif
-!ifndef CREATE_UNINSTALLER
+!else
     OutFile "%self.install_exe_filename()%"
 !endif
 
@@ -38,7 +37,7 @@ InstallDirRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self
 !insertmacro MUI_PAGE_LICENSE "${SRC_DIR}\_cpack\license.txt"
 %end
 
-%if len(self.components) > 1:
+%if len(self.components) > 0:
 !insertmacro MUI_PAGE_COMPONENTS
 %end
 
@@ -50,30 +49,60 @@ InstallDirRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self
 ; Languages.
 !insertmacro MUI_LANGUAGE "English"
 
-Section "Core"
+%for component in self.components:
+Section %self.section_name(component)%
     SetOutPath "$INSTDIR"
-!ifndef CREATE_UNINSTALLER
+    File /r "%component.name%\*.*"
+    WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "Component-%component.name%" 0x00000001
+SectionEnd
+%end
+
+%for install_exe in self.redist_file_names():
+Section "%os.path.splitext(os.path.basename(install_exe))[0]%"
+    SetOutPath "$INSTDIR"
+    File "_redist\%os.path.normcase(install_exe)%"
+    ExecWait '"$INSTDIR\%os.path.normcase(install_exe)%" /S'
+    Delete "$INSTDIR\%os.path.normcase(install_exe)%"
+SectionEnd
+%end
+
+Section "-Core"
+    SetOutPath "$INSTDIR"
     File "uninstall.exe"
-!endif
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "DisplayName" "%self.display_name%"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "DisplayVersion" "%self.version%"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "Publisher" "%self.vendor%"
+    WriteRegDword HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "VersionMinor" 0x%hex(self.minor_version())%
+    WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "VersionMajor" 0x%hex(self.major_version())%
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "InstallLocation" "$INSTDIR"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "UninstallString" "$INSTDIR\uninstall.exe"
+    WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "EstimatedSize" 0x%hex(self.file_size() // 1024)%
+    WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "NoModify" 0x1
+    WriteRegDWord HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "NoRepair" 0x1
 SectionEnd
 
 ; Recipe to uninstall the application
 Section "Uninstall"
-%directory_names = set()
-%for component in self.components.values():
-    %for file_name in component.file_names:
-        %directory_names.add(os.path.dirname(file_name))
-    Delete "$INSTDIR\%os.path.normcase(file_name)%"
-    %end
-%end
+%for component in self.components:
+    ; Uninstall %component.display_name%
+    ReadRegDWord $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "Component-%component.name%"
+    StrCmp "$0" "" skip_uninstall_%component.name%
 
-%for directory_name in directory_names:
-    RMDir "$INSTDIR\%os.path.normcase(directory_name)%"
+    %for file_name in component.file_names:
+        Delete "$INSTDIR\%os.path.normcase(file_name)%"
+    %end
+    %for directory_name in reversed(component.directory_names()):
+        RMDir "$INSTDIR\%os.path.normcase(directory_name)%"
+    %end
+
+    DeleteRegValue HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "Component-%component.name%"
+skip_uninstall_%component.name%:
 %end
 
     Delete "$INSTDIR\uninstall.exe"
     RMDir "$INSTDIR"
+    ; Try to remove the Vendor directory
+    RMDir "$INSTDIR\.."
     DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%"
 SectionEnd
 
@@ -83,5 +112,42 @@ Function .onInit
 !ifdef CREATE_UNINSTALLER
     WriteUninstaller "%self.uninstall_exe_filename()%"
     Quit
+!else
+    ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "UninstallString"
+    StrCmp "$0" "" install already_installed
+
+already_installed:
+    MessageBox MB_YESNOCANCEL|MB_ICONEXCLAMATION \
+        "%self.display_name% is already installed. $\n$\nDo you want to uninstall the old version before installing the new one?" \
+        /SD IDYES IDYES uninstall IDNO install
+    Abort
+
+uninstall:
+ClearErrors
+    StrLen $2 "\uninstall.exe"
+    ; remove "\uninstall.exe" from UninstallString to get path
+    StrCpy $3 $0 -$2
+    ; Do not copy the uninstaller to a temp file
+    ExecWait '"$0" /S _?=$3'
+
+    IfErrors uninstall_failed install
+
+uninstall_failed:
+    MessageBox MB_OK|MB_ICONSTOP "Uninstall failed."
+    Abort
+
+install:
 !endif
+FunctionEnd
+
+Function un.onInit
+    ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "InstallLocation"
+    StrCmp "$0" "" not_installed installed
+
+not_installed:
+    MessageBox MB_OK "%self.display_name% is not installed."
+    Abort
+
+installed:
+    StrCpy $INSTDIR "$0"
 FunctionEnd

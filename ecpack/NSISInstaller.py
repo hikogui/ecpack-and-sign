@@ -28,6 +28,14 @@ class NSISInstaller (ecpack.Installer.Installer):
     def create_uninstaller_exe_filename(self):
         return os.path.abspath(os.path.join(self.prefix, "create_uninstaller.exe"))
 
+    def section_name(self, component):
+        return '{}"{}{}" {}'.format(
+            '' if component.enabled else '/o ',
+            '-' if component.hidden else '!' if component.required else '',
+            component.display_name,
+            component.name
+        )
+
     def create_installer_nsi(self):
         template_text = open(self.installer_nsi_in_filename(), "r").read()
         text = ecpack.psp.psp(template_text, {"self": self})
@@ -50,7 +58,7 @@ class NSISInstaller (ecpack.Installer.Installer):
         self.extract_directory("_redist")
         self.extract_directory("_cpack")
 
-        for component in self.components.values():
+        for component in self.components:
             for executable_file_name in component.executable_file_names():
                 ecpack.sign_executable.sign_executable(executable_file_name)
 

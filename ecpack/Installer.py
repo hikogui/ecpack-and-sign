@@ -16,6 +16,17 @@ class Component (object):
         self.file_names = []
         self.file_size = 0
 
+    def directory_names(self):
+        """Return a list of directories sorted for adding
+        """
+        directories = set()
+        for file_name in self.file_names:
+            dir_name = os.path.dirname(file_name)
+            if dir_name != "":
+                directories.add(os.path.dirname(file_name))
+
+        return sorted(directories)
+
     def add_file_name(self, file_name, file_size):
         self.file_names.append(file_name)
         self.file_size += file_size
@@ -27,17 +38,13 @@ class Component (object):
 
     def extract_files(self, zip_file, prefix):
         """Extract all the files of a component.
-        The component directory at the root of the zip file is removed from the
-        path when stored into the prefix directory.
-        Which means with multiple components the files are merged into the same
-        directory.
 
         @param zip_file An open zip file
         @param prefix The directory to store the files in.
         """
         for file_name in self.file_names:
             zip_item = self.name + "/" + file_name
-            out_file_name = prefix + "/" + file_name
+            out_file_name = os.path.join(prefix, os.path.normcase(zip_item))
             out_dir_name = os.path.dirname(out_file_name)
 
             os.makedirs(out_dir_name, exist_ok=True)
@@ -67,7 +74,7 @@ class Installer (object):
 
     @classmethod
     def parse_components(cls, ecpack_data, zip_file):
-        components = {}
+        components = []
         for name, component_data in ecpack_data["components"].items():
             # Ignore all components that start with an underscore.
             if not name.startswith("_"):
@@ -90,14 +97,14 @@ class Installer (object):
                         continue
                     component.add_file_name(zip_info.filename[len(component_prefix):], zip_info.file_size)
 
-                components[component.name] = component
+                components.append(component)
 
         return components
 
     def extract_components(self):
         """Extract files from each component and merge them in the same directory
         """
-        for component in self.components.values():
+        for component in self.components:
             component.extract_files(self.zip_file, self.prefix)
 
     def extract_directory(self, directory):
@@ -114,6 +121,17 @@ class Installer (object):
                 out_fd.write(self.zip_file.read(zip_info))
                 out_fd.close()
 
+    def redist_file_names(self):
+        install_exe_file_names = []
+        for zip_info in self.zip_file.infolist():
+            if zip_info.is_dir():
+                continue
+            if zip_info.filename.startswith("_redist/"):
+                install_exe_file_names.append(zip_info.filename[8:])
+
+        return sorted(install_exe_file_names)
+
+
     def file_exists(self, file_name):
         """Check if a file exists in the zip file
         """
@@ -122,3 +140,11 @@ class Installer (object):
                 return True
         return False
 
+    def file_size(self):
+        return sum(x.file_size for x in self.components)
+
+    def major_version(self):
+        return int(self.version.split(".")[0])
+
+    def minor_version(self):
+        return int(self.version.split(".")[1])
