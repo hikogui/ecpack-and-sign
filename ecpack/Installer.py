@@ -63,7 +63,7 @@ class Installer (object):
             package_data = json.load(package_json)
             self.name = package_data["name"]
             self.display_name = package_data["display-name"]
-            self.version = package_data["version-string"]
+            self.version = package_data["version"]
             self.license = package_data["license"]
             self.homepage = package_data["homepage"]
             self.description = package_data["description"]
