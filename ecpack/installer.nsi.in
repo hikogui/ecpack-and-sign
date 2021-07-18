@@ -57,12 +57,30 @@ Section %self.section_name(component)%
 SectionEnd
 %end
 
-%for install_exe in self.redist_file_names():
-Section "%os.path.splitext(os.path.basename(install_exe))[0]%"
+%for command in self.redist_install_commands():
+Section "%os.path.splitext(os.path.basename(command.install_exe))[0]%"
     SetOutPath "$INSTDIR"
-    File "_redist\%os.path.normcase(install_exe)%"
-    ExecWait '"$INSTDIR\%os.path.normcase(install_exe)%" /S'
-    Delete "$INSTDIR\%os.path.normcase(install_exe)%"
+    File "_redist\%os.path.normcase(command.install_exe)%"
+
+    ExecWait '"$INSTDIR\%os.path.normcase(command.install_exe)%" %command.options%' $0
+  %for code in command.success_exit_codes:
+    IntCmpU $0 %code% done 0 0
+  %end
+
+  %for code in command.reboot_exit_codes:
+    IntCmpU $0 %code% 0 +3 +3
+    SetRebootFlag true
+    goto done
+  %end
+
+  %if command.fallback_options is not None:
+    ExecWait '"$INSTDIR\%os.path.normcase(command.install_exe)%" %command.fallback_options%'
+  %else:
+    SetErrors
+  %end
+
+done:
+    Delete "$INSTDIR\%os.path.normcase(command.install_exe)%"
 SectionEnd
 %end
 
@@ -125,7 +143,7 @@ already_installed:
     Abort
 
 uninstall:
-ClearErrors
+    ClearErrors
     StrLen $2 "\uninstall.exe"
     ; remove "\uninstall.exe" from UninstallString to get path
     StrCpy $3 $0 -$2
@@ -142,6 +160,14 @@ install:
 !endif
 FunctionEnd
 
+
+Function .onInstSuccess
+    IfRebootFlag 0 noreboot
+    MessageBox MB_YESNO "A reboot is required to finish the installation. Do you wish to reboot now?" IDNO noreboot
+    Reboot
+noreboot:
+FunctionEnd
+
 Function un.onInit
     ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\%self.display_name%" "InstallLocation"
     StrCmp "$0" "" not_installed installed
@@ -153,3 +179,4 @@ not_installed:
 installed:
     StrCpy $INSTDIR "$0"
 FunctionEnd
+

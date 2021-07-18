@@ -153,3 +153,4 @@ def psp(text, namespace, separator="%"):
     python_code = parse_psp(text, separator)
     exec(python_code, globals(), namespace)
     return "".join(namespace["__r"])
+

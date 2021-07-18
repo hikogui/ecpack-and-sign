@@ -53,6 +53,27 @@ class Component (object):
                 out_fd.write(zip_file.read(zip_item))
                 out_fd.close()
 
+class InstallCommand (object):
+    def __init__(self, install_exe):
+        self.install_exe = install_exe
+        self.options = ""
+        self.fallback_options = None
+        self.success_exit_codes = [0]
+        self.reboot_exit_codes = []
+
+        if self.install_exe.endswith("VC_redist.x64.exe"):
+            self.options = "/install /passive /norestart"
+            # 0: Install successful
+            # 1602: User cancelled installation
+            # 1638: Newer version is already installed.
+            # 1641: Success; rebooting.
+            self.success_exit_codes = [0, 1602, 1638, 1641]
+            self.fallback_options = "/install"
+            # 3010: Success; reboot required.
+            self.reboot_exit_codes = [3010]
+
+    def cmp(self):
+        return cmp(self.install_exe)        
 
 class Installer (object):
     def __init__(self, zip_file, prefix):
@@ -136,15 +157,16 @@ class Installer (object):
                 out_fd.write(self.zip_file.read(zip_info))
                 out_fd.close()
 
-    def redist_file_names(self):
-        install_exe_file_names = []
+    def redist_install_commands(self):
+        install_commands = []
         for zip_info in self.zip_file.infolist():
             if zip_info.is_dir():
                 continue
-            if zip_info.filename.startswith("_redist/"):
-                install_exe_file_names.append(zip_info.filename[8:])
 
-        return sorted(install_exe_file_names)
+            if zip_info.filename.startswith("_redist/"):
+                install_commands.append(InstallCommand(zip_info.filename[8:]))
+
+        return sorted(install_commands)
 
 
     def file_exists(self, file_name):
