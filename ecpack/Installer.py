@@ -101,27 +101,29 @@ class Installer (object):
         components = []
         for name, component_data in ecpack_data["components"].items():
             # Ignore all components that start with an underscore.
-            if not name.startswith("_"):
-                component = Component(
-                    name=component_data["name"],
-                    display_name=component_data["displayName"],
-                    description=component_data["description"],
-                    enabled=not component_data["isDisabledByDefault"],
-                    hidden=component_data["isHidden"],
-                    required=component_data["isRequired"],
-                    dependencies=[x for x in component_data["dependencies"] if not x.startswith("_")]
-                )
+            if name.startswith("_") or name.lower() in ("unspecified"):
+                continue
 
-                # Get a list of files belonging to this component.
-                component_prefix = name + "/"
-                for zip_info in zip_file.infolist():
-                    if zip_info.is_dir():
-                        continue
-                    if not zip_info.filename.startswith(component_prefix):
-                        continue
-                    component.add_file_name(zip_info.filename[len(component_prefix):], zip_info.file_size)
+            component = Component(
+                name=component_data["name"],
+                display_name=component_data["displayName"],
+                description=component_data["description"],
+                enabled=not component_data["isDisabledByDefault"],
+                hidden=component_data["isHidden"],
+                required=component_data["isRequired"],
+                dependencies=[x for x in component_data["dependencies"] if not x.startswith("_")]
+            )
 
-                components.append(component)
+            # Get a list of files belonging to this component.
+            component_prefix = name + "/"
+            for zip_info in zip_file.infolist():
+                if zip_info.is_dir():
+                    continue
+                if not zip_info.filename.startswith(component_prefix):
+                    continue
+                component.add_file_name(zip_info.filename[len(component_prefix):], zip_info.file_size)
+
+            components.append(component)
 
         return components
 
