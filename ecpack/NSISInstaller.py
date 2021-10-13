@@ -22,7 +22,7 @@ class NSISInstaller (ecpack.Installer.Installer):
         return os.path.abspath(os.path.join(self.prefix, "uninstall.exe"))
 
     def install_exe_filename(self):
-        filename = "install-" + self.name + "-v" + self.version.replace(".", "-") + ".exe"
+        filename = "install-" + self.name + "-" + self.version + ".exe"
         return os.path.abspath(os.path.join(self.prefix, filename))
 
     def create_uninstaller_exe_filename(self):
